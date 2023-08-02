@@ -13,7 +13,7 @@ DataPack, contributed by the Mind Network Team, is to enable data transformation
 
 ### Dependencies
 
-* Python > 3.8
+* Python >= 3.8
 * pip
 * mindlakesdk
 * arseeding
@@ -30,6 +30,7 @@ from minddatapack import DataPack
 
 ### More examples
 * [use case of arweave in jupyter](/examples/use_case_arweave.ipynb)
+* [use case of IPFS in jupyter](/examples/use_case_ipfs.ipynb)
 
 ## code
 ```
@@ -37,6 +38,7 @@ mind-datapack-python
 |-- minddatapack # source code
 |   |-- __init__.py
 |   |-- arweaveconnector.py
+|   |-- ipfsconnector.py
 |   |-- localfileconnector.py
 |   |-- mindlakeconnector.py
 |   └-- utils.py
@@ -59,6 +61,8 @@ Full doc: [https://mind-network.gitbook.io/mind-lake-sdk](https://mind-network.g
 
 * v1.0
     * Initial Release
+* v1.0.1
+    * Add IPFS support
 
 ## License
 

@@ -3,6 +3,7 @@ from mindlakesdk.utils import ResultType, DataType
 from mindlakesdk.datalake import DataLake
 
 METADATA_EXT = '.meta.json'
+CACHE_PREFIX = 'datapack_cache_'
 
 class Column(DataLake.Column):
     def __init__(self, columnName: str, dataType: DataType, encrypt: bool, dataKey: bytes = None):

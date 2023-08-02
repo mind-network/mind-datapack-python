@@ -56,21 +56,20 @@ def saveToLocalFile(dataPack, filePath: str, ignoreEncrypt: bool, columns: list,
     with open(filePath, 'w') as file:
         writer = csv.writer(file)
         writer.writerow(dataPack.columnName)
-        if ignoreEncrypt:
-            for row in dataPack.data:
-                writer.writerow(row)
-        else:
-            for row in dataPack.data:
-                rowEncrypted = []
-                for index, cell in enumerate(row):
-                    if columns[index].encrypt:
-                        encryptResult = __encrypt(cell, columns[index])
-                        if not encryptResult:
-                            return encryptResult
-                        rowEncrypted.append(encryptResult.data)
+        for row in dataPack.data:
+            rowEncoded = []
+            for index, cell in enumerate(row):
+                if not ignoreEncrypt and columns[index].encrypt:
+                    encryptResult = __encrypt(cell, columns[index])
+                    if not encryptResult:
+                        return encryptResult
+                    rowEncoded.append(encryptResult.data)
+                else:
+                    if columns[index].type == DataType.timestamp:
+                        rowEncoded.append(cell.strftime('%Y-%m-%d %H:%M:%S.%f'))
                     else:
-                        rowEncrypted.append(cell)
-                writer.writerow(rowEncrypted)
+                        rowEncoded.append(str(cell))
+            writer.writerow(rowEncoded)
 
     sha256_hash = SHA256.new()
     with open(filePath, 'rb') as file:
@@ -78,16 +77,17 @@ def saveToLocalFile(dataPack, filePath: str, ignoreEncrypt: bool, columns: list,
             sha256_hash.update(chunk)
     sha256_hash_hex = sha256_hash.hexdigest()
 
-    metadata = __buildMetadata(dataPack.fileName, ignoreEncrypt, sha256_hash_hex, columns, walletAccount)
+    metadata = __buildMetadata(dataPack.fileName, ignoreEncrypt, sha256_hash_hex, columns, walletAccount, dataPack.version)
     with open(filePath+minddatapack.utils.METADATA_EXT, 'w') as file:
         json.dump(metadata, file)
     return ResultType(0, None)
 
-def __buildMetadata(fileName: str, ignoreEncrypt: bool, fileHash: str, columns: list, walletAccount) -> dict:
+def __buildMetadata(fileName: str, ignoreEncrypt: bool, fileHash: str, columns: list, walletAccount, version: str) -> dict:
     metadata = {}
     metadata['FileName'] = fileName
     metadata['IgnoreEncrypt'] = ignoreEncrypt
     metadata['FileHash'] = fileHash
+    metadata['Version'] = version
     metadata['Column'] = []
     for column in columns:
         columnMeta = {}
@@ -128,25 +128,25 @@ def loadFromLocalFile(dataPack, filePath: str, walletAccount):
         dataPack.columnName = next(reader)
         dataPack.data = []
         for row in reader:
-            rowDecrypted = []
+            rowDecoded = []
             for index, cell in enumerate(row):
                 if not ignoreEncrypt and columns[index].encrypt:
                     decryptResult = __decrypt(cell, columns[index])
                     if not decryptResult:
                         return decryptResult
-                    rowDecrypted.append(decryptResult.data)
+                    rowDecoded.append(decryptResult.data)
                 else:
                     if columns[index].type == DataType.int4 or columns[index].type == DataType.int8:
-                        rowDecrypted.append(int(cell))
+                        rowDecoded.append(int(cell))
                     elif columns[index].type == DataType.float4 or columns[index].type == DataType.float8:
-                        rowDecrypted.append(float(cell))
+                        rowDecoded.append(float(cell))
                     elif columns[index].type == DataType.decimal:
-                        rowDecrypted.append(Decimal(cell))
+                        rowDecoded.append(Decimal(cell))
                     elif columns[index].type == DataType.timestamp:
-                        rowDecrypted.append(datetime.datetime.strptime(cell, '%Y-%m-%d %H:%M:%S.%f'))
+                        rowDecoded.append(datetime.datetime.strptime(cell, '%Y-%m-%d %H:%M:%S.%f'))
                     else:
-                        rowDecrypted.append(cell)
-            dataPack.data.append(rowDecrypted)
+                        rowDecoded.append(cell)
+            dataPack.data.append(rowDecoded)
         dataPack.existData = True
     return ResultType(0, "Success"), columns
 

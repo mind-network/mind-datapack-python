@@ -2,6 +2,7 @@ import json
 import os
 import logging
 import requests
+from datetime import datetime
 from mindlakesdk.utils import ResultType
 import minddatapack.utils
 
@@ -36,8 +37,8 @@ def saveToArweave(dataPack, fileName: str, tokenName: str, arWalletFile: str, et
             os.remove(metaFileName)
 
 def loadFromArweave(dataPack, id: str, arGateway: str):
-    metaFileName = None
-    dataFileName = None
+    cacheDataFileName = minddatapack.utils.CACHE_PREFIX + datetime.now().strftime("%Y%m%d%H%M%S%f") + '.csv'
+    cacheMetaFileName = cacheDataFileName + minddatapack.utils.METADATA_EXT
     try:
         if arGateway[-1] != '/':
             arGateway += '/'
@@ -46,26 +47,23 @@ def loadFromArweave(dataPack, id: str, arGateway: str):
         if metaResponse and metaResponse.status_code == 200:
             txMeta = json.loads(metaResponse.text)
             metadataJsonStr = txMeta['tags'][1]['value']
-            metadata = json.loads(metadataJsonStr)
-            dataFileName = metadata['FileName']
-            metaFileName = dataFileName + minddatapack.utils.METADATA_EXT
-            with open(metaFileName, 'wb') as file:
+            with open(cacheMetaFileName, 'wb') as file:
                 file.write(metadataJsonStr.encode('utf-8'))
             
             dataUrl = arGateway + id
             dataResponse = requests.get(dataUrl)
             if dataResponse and dataResponse.status_code == 200:
-                with open(dataFileName, 'wb') as file:
+                with open(cacheDataFileName, 'wb') as file:
                     file.write(dataResponse.content)
 
-            return dataPack.loadFromLocalFile(dataFileName)
+            return dataPack.loadFromLocalFile(cacheDataFileName)
         else:
             return ResultType(60001, "Network error", None)
     except Exception as e:
         logging.debug("Exception:", str(e))
         return ResultType(60014, "Fail to connect to Arweave", None)
     finally:
-        if dataFileName and os.path.exists(dataFileName):
-            os.remove(dataFileName)
-        if metaFileName and os.path.exists(metaFileName):
-            os.remove(metaFileName)
+        if os.path.exists(cacheDataFileName):
+            os.remove(cacheDataFileName)
+        if os.path.exists(cacheMetaFileName):
+            os.remove(cacheMetaFileName)
