@@ -1,7 +1,18 @@
+import datetime
 import mindlakesdk
 from mindlakesdk.utils import ResultType, DataType
 import minddatapack.utils
 
+class MindLakeConnector(minddatapack.utils.Connector):
+    def __init__(self, mindLake: mindlakesdk.MindLake):
+        self.mindLake = mindLake
+    
+    def save(self, dataPack: "minddatapack.DataPack", tableName: str) -> ResultType:
+        return dataPack._saveToMindLake(tableName, self.mindLake)
+    
+    def load(self, dataPack: "minddatapack.DataPack", sqlStatement: str) -> ResultType:
+        return dataPack._loadFromMindByQuery(sqlStatement, self.mindLake)
+    
 def loadFromMindByQuery(dataPack, sqlStatement: str, mindLake: mindlakesdk.MindLake) -> ResultType:
     result = mindLake.datalake.queryForDataAndMeta(sqlStatement)
     if not result:
@@ -31,6 +42,13 @@ def loadFromMindByQuery(dataPack, sqlStatement: str, mindLake: mindlakesdk.MindL
                 if not decryptResult:
                     return decryptResult
                 rowResult.append(decryptResult.data)
+            elif columns[index].type == DataType.timestamp:
+                if(len(cell) == 19):
+                    rowResult.append(datetime.datetime.strptime(cell, '%Y-%m-%d %H:%M:%S'))
+                elif(len(cell) == 26):
+                    rowResult.append(datetime.datetime.strptime(cell, '%Y-%m-%d %H:%M:%S.%f'))
+                else:
+                    return ResultType(60015, 'Invalid timestamp format'), None
             else:
                 rowResult.append(cell)
         dataPack.data.append(rowResult)
@@ -51,8 +69,10 @@ def saveToMindLake(tableName: str, mindLake: mindlakesdk.MindLake, data, columns
                     return encryptResult
                 insert_value = insert_value + "'" + encryptResult.data + "',"
             else:
-                if column.type == DataType.text or column.type == DataType.timestamp:
-                    insert_value = insert_value + "'" + str(cell) + "',"
+                if column.type == DataType.text:
+                    insert_value = insert_value + "'" + cell + "',"
+                elif column.type == DataType.timestamp:
+                    insert_value = insert_value + "'" + cell.strftime('%Y-%m-%d %H:%M:%S.%f') + "',"
                 else:
                     insert_value = insert_value + str(cell) + ","
         result = mindLake.datalake.query(f'INSERT INTO "{tableName}" VALUES ({insert_value[:-1]})')

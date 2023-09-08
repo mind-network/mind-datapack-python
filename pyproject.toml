@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "minddatapack"
-version = "v1.0.1"
+version = "v1.0.3"
 authors = [
   { name="Mind Labs", email="biz@mindnetwork.xyz" },
 ]

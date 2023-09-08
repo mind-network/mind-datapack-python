@@ -63,6 +63,8 @@ Full doc: [https://mind-network.gitbook.io/mind-lake-sdk](https://mind-network.g
     * Initial Release
 * v1.0.1
     * Add IPFS support
+* v1.0.3
+    * Change connectors to be class
 
 ## License
 
