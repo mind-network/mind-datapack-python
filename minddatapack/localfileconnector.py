@@ -13,6 +13,20 @@ import mindlakesdk
 from mindlakesdk.utils import ResultType, DataType
 import minddatapack.utils
 
+class LocalFileConnector(minddatapack.utils.Connector):
+    def __init__(self, ignoreEncrypt: bool = False, columns: list = None):
+        self.ignoreEncrypt = ignoreEncrypt
+        self.columns = columns
+    
+    def save(self, dataPack: "minddatapack.DataPack", filePath: str) -> ResultType:
+        return dataPack._saveToLocalFile(filePath, self.ignoreEncrypt)
+    
+    def load(self, dataPack: "minddatapack.DataPack", filePath: str) -> ResultType:
+        if self.columns:
+            return dataPack._loadFromCSVFileByDefineColumn(filePath, self.columns)
+        else:
+            return dataPack._loadFromLocalFile(filePath)
+
 def __encrypt(data, columnMeta: minddatapack.utils.Column) -> ResultType:
     try:
         data = __encodeByDataType(data, columnMeta.type)
@@ -49,7 +63,7 @@ def __decrypt(cipher: str, columnMeta: minddatapack.utils.Column) -> ResultType:
         return ResultType(60013, 'Decrypt data failed')
     return ResultType(0, "Success", data)
 
-def saveToLocalFile(dataPack, filePath: str, ignoreEncrypt: bool, columns: list, walletAccount):
+def saveToLocalFile(dataPack: "minddatapack.DataPack", filePath: str, ignoreEncrypt: bool, columns: list, walletAccount):
     if not dataPack.existData:
         return ResultType(60006, 'No data in DataPack')
     dataPack.fileName = os.path.basename(filePath)
@@ -102,13 +116,13 @@ def __buildMetadata(fileName: str, ignoreEncrypt: bool, fileHash: str, columns: 
         metadata['Column'].append(columnMeta)
     return metadata
 
-def loadFromLocalFile(dataPack, filePath: str, walletAccount):
+def loadFromLocalFile(dataPack: "minddatapack.DataPack", filePath: str, walletAccount):
     # the path of the meta file should be filePath + '.meta.json'
     metaFilePath = filePath + minddatapack.utils.METADATA_EXT
     if not os.path.exists(filePath):
-        return ResultType(60007, 'CSV File not found')
+        return ResultType(60007, 'CSV File not found'), None
     if not os.path.exists(metaFilePath):
-        return ResultType(60008, 'Metadata file not found')
+        return ResultType(60008, 'Metadata file not found'), None
     with open(metaFilePath, 'r') as file:
         metadata = json.load(file)
         dataPack.fileName = metadata['FileName']
@@ -133,7 +147,7 @@ def loadFromLocalFile(dataPack, filePath: str, walletAccount):
                 if not ignoreEncrypt and columns[index].encrypt:
                     decryptResult = __decrypt(cell, columns[index])
                     if not decryptResult:
-                        return decryptResult
+                        return decryptResult, None
                     rowDecoded.append(decryptResult.data)
                 else:
                     if columns[index].type == DataType.int4 or columns[index].type == DataType.int8:
@@ -143,14 +157,19 @@ def loadFromLocalFile(dataPack, filePath: str, walletAccount):
                     elif columns[index].type == DataType.decimal:
                         rowDecoded.append(Decimal(cell))
                     elif columns[index].type == DataType.timestamp:
-                        rowDecoded.append(datetime.datetime.strptime(cell, '%Y-%m-%d %H:%M:%S.%f'))
+                        if(len(cell) == 19):
+                            rowDecoded.append(datetime.datetime.strptime(cell, '%Y-%m-%d %H:%M:%S'))
+                        elif(len(cell) == 26):
+                            rowDecoded.append(datetime.datetime.strptime(cell, '%Y-%m-%d %H:%M:%S.%f'))
+                        else:
+                            return ResultType(60015, 'Invalid timestamp format'), None
                     else:
                         rowDecoded.append(cell)
             dataPack.data.append(rowDecoded)
         dataPack.existData = True
     return ResultType(0, "Success"), columns
 
-def loadFromCSVFileByDefineColumn(dataPack, csvFilePath: str, columns: list):
+def loadFromCSVFileByDefineColumn(dataPack: "minddatapack.DataPack", csvFilePath: str, columns: list):
     # the whole csv file should be in plain text
     if not os.path.exists(csvFilePath):
         return ResultType(60007, 'CSV File not found')
@@ -178,7 +197,12 @@ def loadFromCSVFileByDefineColumn(dataPack, csvFilePath: str, columns: list):
                 elif columns[index].type == DataType.decimal:
                     formattedRow.append(Decimal(cell))
                 elif columns[index].type == DataType.timestamp:
-                    formattedRow.append(datetime.datetime.strptime(cell, '%Y-%m-%d %H:%M:%S.%f'))
+                    if(len(cell) == 19):
+                        formattedRow.append(datetime.datetime.strptime(cell, '%Y-%m-%d %H:%M:%S'))
+                    elif(len(cell) == 26):
+                        formattedRow.append(datetime.datetime.strptime(cell, '%Y-%m-%d %H:%M:%S.%f'))
+                    else:
+                        return ResultType(60015, 'Invalid timestamp format'), None
                 else:
                     formattedRow.append(cell)
             dataPack.data.append(formattedRow)
